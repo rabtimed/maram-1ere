@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""
-Régénère images/manifest.json à partir des fichiers images présents
-dans le dossier images/.
-Usage :  python generate_manifest.py
-"""
+"""Régénère images/manifest.json à partir des fichiers présents dans images/."""
 import json
 import os
 import sys
@@ -24,13 +20,19 @@ def main():
     )
 
     data = {"images": files}
-
     with open(MANIFEST, "w", encoding="utf-8") as fh:
         json.dump(data, fh, ensure_ascii=False, indent=2)
 
     print(f"✅ {len(files)} image(s) écrite(s) dans {MANIFEST}")
     for f in files:
         print("   •", f)
+
+    if files:
+        print()
+        print("👉 N'oubliez pas de publier :")
+        print("   git add .")
+        print('   git commit -m "Mise à jour des images"')
+        print("   git push")
 
 
 if __name__ == "__main__":

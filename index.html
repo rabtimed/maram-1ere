@@ -151,6 +151,18 @@
   .gallery-item img{
     width:100%;height:100%;object-fit:cover;display:block;
   }
+  /* Badge pour les images ajoutées localement */
+  .gallery-item[data-local]::after{
+    content:"📤";
+    position:absolute;
+    top:2px;
+    right:2px;
+    font-size:.75rem;
+    background:rgba(255,255,255,.9);
+    border-radius:4px;
+    padding:0 4px;
+    line-height:1.2;
+  }
 
   /* ============ APERÇU IMAGE SÉLECTIONNÉE ============ */
   .img-preview-wrap{margin-top:.7rem;}
@@ -217,25 +229,26 @@
     width:100%;
   }
   .sheet-figure img{
-    width:100%;
-    max-width:100%;
-    max-height:520px;
+    width:auto;
+    max-width:60%;
+    max-height:320px;
     object-fit:contain;
     border-radius:12px;
     display:block;
     margin:0 auto;
   }
   @media (max-width:600px){
-    .sheet-figure img{max-height:340px;}
+    .sheet-figure img{max-width:85%;max-height:220px;}
   }
+  
   .sheet-text{
     direction:rtl;
     text-align:right;
     font-family:var(--ar-font);
-    font-size:clamp(1.25rem,2.4vw,1.75rem);
-    line-height:2.7;
+    font-size:clamp(1.8rem,3.8vw,2.8rem);
+    line-height:2.9;
     white-space:pre-wrap;
-    word-spacing:.06rem;
+    word-spacing:.08rem;
     color:#0f172a;
   }
 
@@ -246,8 +259,8 @@
     vertical-align:super;line-height:1;padding-left:.15rem;
   }
   .blank{
-    display:inline-block;min-width:clamp(3rem,7vw,5.5rem);height:1.05em;
-    border-bottom:2px dashed #94a3b8;vertical-align:baseline;margin:0 .12rem;
+    display:inline-block;min-width:clamp(4rem,9vw,7rem);height:1.05em;
+    border-bottom:2px dashed #94a3b8;vertical-align:baseline;margin:0 .15rem;
   }
 
   /* --- Banque de mots --- */
@@ -275,8 +288,8 @@
     .sheet{border:none;border-radius:0;padding:0;box-shadow:none;}
     .sheet-body{gap:.6cm;}
     .sheet-figure{max-width:100%;}
-    .sheet-figure img{max-height:9cm;}
-    .sheet-text{font-size:18pt;line-height:2.6;color:#000;}
+    .sheet-figure img{max-width:60%;max-height:6cm;}
+    .sheet-text{font-size:22pt;line-height:2.9;color:#000;}
     .blank{border-bottom:2px solid #000;}
     .bnum{color:#000;}
     .bank-word{border:1px solid #999;background:#fff;}
@@ -341,6 +354,15 @@
 
       <div class="field">
         <label>4. Image (optionnel)</label>
+
+        <div class="row">
+          <button type="button" class="btn btn-primary btn-sm" id="btnUploadLocal">
+            📤 Ajouter une photo depuis mon appareil
+          </button>
+        </div>
+
+        <!-- Input caché pour la sélection d'image locale -->
+        <input type="file" id="localImgInput" accept="image/*" class="hidden">
 
         <div class="row">
           <button type="button" class="btn btn-ghost btn-sm" id="btnReloadGallery">
@@ -418,6 +440,7 @@
   const viewExercise= $('view-exercise');
   const gallery     = $('gallery');
   const galleryHint = $('galleryHint');
+  const localImgInput = $('localImgInput');
 
   /* ========================================================
      OUTILS TEXTE ARABE
@@ -621,7 +644,7 @@
       headHtml += '</div>';
     }
 
-    /* --- Image (au-dessus) --- */
+    /* --- Image (au-dessus du texte) --- */
     const figHtml = state.image
       ? '<figure class="sheet-figure"><img src="' + state.image + '" alt=""></figure>'
       : '';
@@ -797,6 +820,66 @@
   });
 
   /* ========================================================
+     ÉVÉNEMENTS — PHOTO LOCALE (depuis l'appareil)
+     ======================================================== */
+  $('btnUploadLocal').addEventListener('click', () => localImgInput.click());
+
+  localImgInput.addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('Veuillez choisir un fichier image (JPG, PNG, GIF, WEBP…).');
+      localImgInput.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const dataUrl = ev.target.result;
+
+      // 1) L'image devient l'image de l'exercice
+      state.image = dataUrl;
+      imgPreview.src = dataUrl;
+      imgWrap.classList.remove('hidden');
+
+      // 2) On l'ajoute à la galerie, en tête, avec un badge 📤
+      gallery.querySelectorAll('.gallery-item.selected')
+             .forEach(el => el.classList.remove('selected'));
+
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'gallery-item selected';
+      item.setAttribute('data-local', '1');
+      item.title = file.name + ' (locale — non publiée)';
+
+      const img = document.createElement('img');
+      img.src = dataUrl;
+      img.alt = file.name;
+      item.appendChild(img);
+
+      item.addEventListener('click', () => {
+        gallery.querySelectorAll('.gallery-item.selected')
+               .forEach(el => el.classList.remove('selected'));
+        item.classList.add('selected');
+        state.image = dataUrl;
+        imgPreview.src = dataUrl;
+        imgWrap.classList.remove('hidden');
+      });
+
+      gallery.insertBefore(item, gallery.firstChild);
+
+      galleryHint.innerHTML =
+        '📤 <strong>' + file.name + '</strong> ajoutée (locale, session uniquement). ' +
+        'Pour la publier définitivement, copiez-la dans <code>/images/</code> ' +
+        'puis relancez <code>python generate_manifest.py</code>.';
+    };
+
+    reader.readAsDataURL(file);
+    localImgInput.value = '';   // permet de re-sélectionner le même fichier
+  });
+
+  /* ========================================================
      ÉVÉNEMENTS — BOUTONS PRINCIPAUX
      ======================================================== */
   $('btnGenerate').addEventListener('click', () => {
@@ -831,6 +914,10 @@
     imgWrap.classList.add('hidden');
     gallery.querySelectorAll('.gallery-item.selected')
            .forEach(el => el.classList.remove('selected'));
+    // On ne vide PAS la galerie : on garde les images publiées visibles
+    // et on retire uniquement les images locales de la session
+    gallery.querySelectorAll('.gallery-item[data-local]')
+           .forEach(el => el.remove());
 
     renderChips();
     renderWordList();
