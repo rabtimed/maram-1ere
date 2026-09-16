@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Générateur de texte à trous — Arabe</title>
+<style>
+  :root{
+    --bg:#eef2f7;
+    --panel:#ffffff;
+    --ink:#0f172a;
+    --muted:#64748b;
+    --line:#e2e8f0;
+    --brand:#2563eb;
+    --brand-dark:#1d4ed8;
+    --radius:14px;
+    --ar-font:"Amiri","Scheherazade New","Traditional Arabic","Arabic Typesetting",
+              "Noto Naskh Arabic","Geeza Pro",Tahoma,"Segoe UI",serif;
+  }
+  *,*::before,*::after{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:"Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+    background:var(--bg);
+    color:var(--ink);
+    line-height:1.55;
+    -webkit-text-size-adjust:100%;
+  }
+
+  /* ============ GESTION DES "PAGES" (vues) ============ */
+  .view{display:none;}
+  .view.active{display:block;}
+
+  /* ============ EN-TÊTE ============ */
+  .topbar{
+    background:linear-gradient(135deg,#1e3a8a,#2563eb);
+    color:#fff;
+    padding:1.4rem 1rem;
+  }
+  .topbar-inner{max-width:900px;margin:0 auto;}
+  .topbar h1{margin:0 0 .3rem;font-size:1.22rem;font-weight:700;}
+  .topbar p{margin:0;font-size:.88rem;opacity:.9;}
+
+  /* ============ PAGE CONFIGURATION ============ */
+  .config-page{
+    max-width:900px;
+    margin:0 auto;
+    padding:1.5rem 1rem 4rem;
+  }
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    box-shadow:0 1px 3px rgba(15,23,42,.06);
+    padding:1.4rem;
+  }
+  @media (max-width:600px){ .panel{padding:1rem;} }
+
+  .panel-title{margin:0 0 1.2rem;font-size:1.05rem;font-weight:700;color:#1e293b;}
+
+  .field{margin-bottom:1.3rem;}
+  .field > label{
+    display:block;font-size:.85rem;font-weight:600;color:#334155;margin-bottom:.4rem;
+  }
+
+  input[type="text"],textarea{
+    width:100%;padding:.65rem .75rem;border:1px solid var(--line);border-radius:10px;
+    font-family:inherit;font-size:.95rem;color:var(--ink);background:#fff;
+  }
+  textarea{resize:vertical;min-height:130px;}
+  textarea[dir="rtl"],input[dir="rtl"]{
+    font-family:var(--ar-font);font-size:1.2rem;line-height:2;
+  }
+  input:focus,textarea:focus{
+    outline:2px solid rgba(37,99,235,.30);outline-offset:1px;border-color:var(--brand);
+  }
+
+  .hint{font-size:.78rem;color:var(--muted);margin:.45rem 0 0;}
+  .row{display:flex;gap:.5rem;align-items:center;margin-top:.55rem;flex-wrap:wrap;}
+  .row input[type="text"]{flex:1;min-width:120px;}
+
+  .check{
+    display:flex;align-items:center;gap:.5rem;
+    margin-top:.7rem;font-size:.88rem;color:#334155;cursor:pointer;
+  }
+  .check input{width:1rem;height:1rem;accent-color:var(--brand);cursor:pointer;}
+
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:.4rem;
+    border:1px solid transparent;border-radius:10px;padding:.65rem 1.05rem;
+    font-size:.9rem;font-weight:600;cursor:pointer;font-family:inherit;transition:.15s;
+  }
+  .btn-primary{background:var(--brand);color:#fff;}
+  .btn-primary:hover{background:var(--brand-dark);}
+  .btn-ghost{background:#fff;border-color:var(--line);color:var(--ink);}
+  .btn-ghost:hover{background:#f8fafc;border-color:#cbd5e1;}
+  .btn-lg{padding:.85rem 1.4rem;font-size:1rem;}
+  .btn-sm{padding:.4rem .7rem;font-size:.8rem;}
+
+  /* ============ PUCES ============ */
+  .chips{
+    display:flex;flex-wrap:wrap;gap:.4rem;min-height:2.8rem;padding:.55rem;
+    background:#f8fafc;border:1px solid var(--line);border-radius:10px;
+    max-height:220px;overflow:auto;
+  }
+  .chip{
+    font-family:var(--ar-font);font-size:1.2rem;line-height:1.6;
+    padding:.12rem .6rem;border-radius:8px;border:1px solid var(--line);
+    background:#fff;color:var(--ink);cursor:pointer;transition:.15s;
+  }
+  .chip:hover{border-color:var(--brand);}
+  .chip-on{background:#fee2e2;border-color:#fca5a5;color:#b91c1c;text-decoration:line-through;}
+  .chips-empty{color:var(--muted);font-size:.85rem;padding:.4rem .2rem;}
+
+  /* ============ LISTE DES MOTS ============ */
+  .word-list{margin-bottom:.2rem;}
+  .word-item{display:flex;gap:.4rem;align-items:center;margin-bottom:.45rem;}
+  .word-item input{
+    flex:1;padding:.5rem .65rem;border:1px solid var(--line);border-radius:8px;
+    font-family:var(--ar-font);font-size:1.15rem;text-align:right;background:#fff;
+  }
+  .icon-btn{
+    width:2.2rem;height:2.2rem;flex:0 0 auto;border-radius:8px;border:1px solid var(--line);
+    background:#fff;color:#ef4444;cursor:pointer;font-size:.9rem;line-height:1;transition:.15s;
+  }
+  .icon-btn:hover{background:#fef2f2;border-color:#fca5a5;}
+
+  /* ============ IMAGE (aperçu config) ============ */
+  .file{width:100%;font-size:.85rem;color:var(--muted);}
+  .img-preview-wrap{margin-top:.7rem;}
+  .img-preview-wrap img{
+    max-width:100%;max-height:180px;border-radius:8px;border:1px solid var(--line);
+    display:block;margin-bottom:.5rem;
+  }
+
+  /* ============ ACTIONS ============ */
+  .actions{
+    display:flex;flex-wrap:wrap;gap:.6rem;
+    margin-top:1.4rem;padding-top:1.2rem;border-top:1px solid var(--line);
+  }
+  .actions .btn{flex:1 1 auto;}
+
+  /* ============ PAGE EXERCICE ============ */
+  .exercise-toolbar{
+    position:sticky;top:0;z-index:10;
+    display:flex;align-items:center;justify-content:space-between;gap:.75rem;
+    padding:.75rem 1rem;
+    background:rgba(255,255,255,.92);
+    backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--line);
+  }
+  .exercise-toolbar-title{font-size:.9rem;font-weight:600;color:#334155;}
+  @media (max-width:600px){
+    .exercise-toolbar-title{display:none;}
+  }
+
+  .exercise-page{
+    max-width:1100px;
+    margin:0 auto;
+    padding:1.5rem 1rem 3rem;
+  }
+  @media (max-width:600px){ .exercise-page{padding:1rem .7rem 2rem;} }
+
+  .empty{text-align:center;padding:4rem 1rem;color:var(--muted);}
+  .empty-icon{font-size:2.6rem;margin-bottom:.5rem;}
+
+  /* ============ FEUILLE D'EXERCICE ============ */
+  .sheet{
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:1.5rem 1.6rem 2rem;
+  }
+  @media (max-width:600px){ .sheet{padding:1rem .9rem 1.5rem;} }
+
+  .sheet-head{margin-bottom:1.1rem;}
+  .sheet-title{
+    margin:0 0 .6rem;text-align:center;
+    font-family:var(--ar-font);font-size:1.4rem;font-weight:700;color:#1e293b;
+  }
+  .sheet-namedate{
+    display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;direction:rtl;
+    font-family:var(--ar-font);font-size:1rem;color:#475569;
+    border-bottom:1px dashed #cbd5e1;padding-bottom:.6rem;
+  }
+
+  /* --- CORPS : image à gauche + texte à droite --- */
+  .sheet-body{
+    display:flex;
+    gap:1.5rem;
+    align-items:flex-start;
+  }
+  .sheet-figure{
+    flex:0 0 auto;
+    max-width:32%;
+    margin:0;
+    text-align:center;
+  }
+  .sheet-figure img{
+    max-width:100%;
+    max-height:300px;
+    border-radius:10px;
+    display:block;
+  }
+  .sheet-text{
+    flex:1 1 auto;
+    min-width:0;
+    direction:rtl;
+    text-align:right;
+    font-family:var(--ar-font);
+    font-size:clamp(1.25rem,2.4vw,1.75rem);
+    line-height:2.7;
+    white-space:pre-wrap;
+    word-spacing:.06rem;
+    color:#0f172a;
+  }
+
+  @media (max-width:700px){
+    .sheet-body{flex-direction:column-reverse;}
+    .sheet-figure{max-width:100%;margin:0 auto;}
+    .sheet-figure img{margin:0 auto;}
+  }
+
+  /* --- Trous --- */
+  .blank-wrap{display:inline-block;white-space:nowrap;}
+  .bnum{
+    font-size:.5em;font-weight:700;color:var(--brand);
+    vertical-align:super;line-height:1;padding-left:.15rem;
+  }
+  .blank{
+    display:inline-block;min-width:clamp(3rem,7vw,5.5rem);height:1.05em;
+    border-bottom:2px dashed #94a3b8;vertical-align:baseline;margin:0 .12rem;
+  }
+
+  /* --- Banque de mots --- */
+  .bank{
+    margin-top:1.6rem;padding-top:1rem;border-top:2px solid var(--line);
+  }
+  .bank h3{
+    margin:0 0 .6rem;direction:rtl;text-align:right;
+    font-family:var(--ar-font);font-size:1.15rem;font-weight:700;color:#334155;
+  }
+  .bank-words{display:flex;flex-wrap:wrap;gap:.5rem;direction:rtl;}
+  .bank-word{
+    font-family:var(--ar-font);font-size:1.35rem;line-height:1.6;
+    padding:.15rem .85rem;border:1px solid #cbd5e1;border-radius:999px;
+    background:#f8fafc;color:#0f172a;
+  }
+
+  .hidden{display:none !important;}
+
+  /* ============ IMPRESSION ============ */
+  @media print{
+    .no-print{display:none !important;}
+    body{background:#fff;}
+    .view{display:none;}
+    .view.active{display:block;}
+    .exercise-page{max-width:none;padding:0;margin:0;}
+    .sheet{border:none;border-radius:0;padding:0;box-shadow:none;}
+    .sheet-body{gap:1cm;}
+    .sheet-figure{max-width:32%;}
+    .sheet-text{font-size:18pt;line-height:2.6;color:#000;}
+    .blank{border-bottom:2px solid #000;}
+    .bnum{color:#000;}
+    .bank-word{border:1px solid #999;background:#fff;}
+    .sheet-namedate{color:#000;border-bottom-color:#999;}
+    @page{margin:1.4cm;}
+  }
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     VUE 1 : PAGE DE CONFIGURATION
+     ============================================================ -->
+<div id="view-config" class="view active">
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <h1>📝 Générateur d'exercices — Texte à trous en arabe</h1>
+      <p>Saisissez le texte, cliquez sur les mots à masquer, ajoutez une image… puis générez l'exercice.</p>
+    </div>
+  </header>
+
+  <main class="config-page">
+    <div class="panel">
+      <h2 class="panel-title">⚙️ Configuration de l'exercice</h2>
+
+      <div class="field">
+        <label for="exTitle">Titre de l'exercice (optionnel)</label>
+        <input id="exTitle" type="text" dir="rtl" lang="ar" placeholder="مثال: الوحدة الأولى – نصّ">
+      </div>
+
+      <div class="field">
+        <label for="arText">1. Texte arabe</label>
+        <textarea id="arText" dir="rtl" lang="ar" rows="6" placeholder="اُكتب أو الصق النصّ العربي هنا…"></textarea>
+        <p class="hint">Le texte s'affiche automatiquement de droite à gauche.</p>
+      </div>
+
+      <div class="field">
+        <label>2. Mots à transformer en espaces vides</label>
+        <div id="chips" class="chips" dir="rtl" lang="ar"></div>
+        <p class="hint">Cliquez sur un mot pour le masquer (recliquez pour l'afficher de nouveau).</p>
+        <div class="row">
+          <button type="button" class="btn btn-ghost btn-sm" id="clearHidden">Tout réafficher</button>
+          <span class="hint" id="hiddenCount" style="margin:0"></span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>3. Liste des mots proposés</label>
+        <div id="wordList" class="word-list" dir="rtl" lang="ar"></div>
+        <div class="row">
+          <input id="newWord" type="text" dir="rtl" lang="ar" placeholder="Ajouter un mot…">
+          <button type="button" class="btn btn-ghost btn-sm" id="addWord">Ajouter</button>
+        </div>
+        <div class="row">
+          <button type="button" class="btn btn-ghost btn-sm" id="fillWords">Remplir avec les mots masqués</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="clearWords">Vider</button>
+        </div>
+        <label class="check"><input type="checkbox" id="shuffleWords"> Mélanger l'ordre des mots</label>
+        <label class="check"><input type="checkbox" id="showNameDate" checked> Afficher la ligne « الاسم / التاريخ »</label>
+      </div>
+
+      <div class="field">
+        <label for="imgInput">4. Image (optionnel — s'affichera à gauche du texte)</label>
+        <input type="file" id="imgInput" class="file" accept="image/*">
+        <div id="imgPreviewWrap" class="img-preview-wrap hidden">
+          <img id="imgPreview" alt="Aperçu de l'image">
+          <button type="button" class="btn btn-ghost btn-sm" id="removeImg">Supprimer l'image</button>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button type="button" class="btn btn-primary btn-lg" id="btnGenerate">✨ Générer l'exercice</button>
+        <button type="button" class="btn btn-ghost" id="btnReset">Réinitialiser</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ============================================================
+     VUE 2 : PAGE DE L'EXERCICE
+     ============================================================ -->
+<div id="view-exercise" class="view">
+
+  <div class="exercise-toolbar no-print">
+    <button type="button" class="btn btn-ghost btn-sm" id="btnBack">← Retour à la configuration</button>
+    <span class="exercise-toolbar-title">👁️ Aperçu de l'exercice</span>
+    <button type="button" class="btn btn-primary btn-sm" id="btnPrint">🖨️ Imprimer</button>
+  </div>
+
+  <main class="exercise-page">
+    <div id="exercise"></div>
+  </main>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ========================================================
+     ÉTAT DE L'APPLICATION
+     ======================================================== */
+  const state = {
+    text: '',
+    hidden: new Set(),
+    words: [],
+    image: null,
+    shuffle: false,
+    showNameDate: true,
+    title: '',
+    seed: 1
+  };
+
+  /* ========================================================
+     RACCOURCIS DOM
+     ======================================================== */
+  const $ = (id) => document.getElementById(id);
+  const arText      = $('arText');
+  const exTitle     = $('exTitle');
+  const chipsEl     = $('chips');
+  const hiddenCount = $('hiddenCount');
+  const wordListEl  = $('wordList');
+  const newWordEl   = $('newWord');
+  const shuffleEl   = $('shuffleWords');
+  const nameDateEl  = $('showNameDate');
+  const imgInput    = $('imgInput');
+  const imgPreview  = $('imgPreview');
+  const imgWrap     = $('imgPreviewWrap');
+  const exerciseEl  = $('exercise');
+  const viewConfig  = $('view-config');
+  const viewExercise= $('view-exercise');
+
+  /* ========================================================
+     OUTILS TEXTE ARABE
+     ======================================================== */
+  const WORD_RE = /[\u0621-\u063A\u0641-\u064A\u064B-\u065F\u0670\u0671-\u06D3\u06D6-\u06ED\u0640]+/g;
+
+  function tokenize(text) {
+    const re = new RegExp(WORD_RE.source, 'g');
+    const out = [];
+    let last = 0, m;
+    while ((m = re.exec(text)) !== null) {
+      if (m.index > last) out.push({ type: 'sep', value: text.slice(last, m.index) });
+      out.push({ type: 'word', value: m[0] });
+      last = m.index + m[0].length;
+    }
+    if (last < text.length) out.push({ type: 'sep', value: text.slice(last) });
+    return out;
+  }
+
+  function normalize(word) {
+    return word
+      .replace(/[\u064B-\u065F\u0670\u06D6-\u06ED\u0640]/g, '')
+      .replace(/[\u0622\u0623\u0625\u0671]/g, '\u0627')
+      .replace(/\u0649/g, '\u064A')
+      .replace(/\u0629/g, '\u0647');
+  }
+
+  function esc(str) {
+    return String(str).replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+  }
+
+  /* ========================================================
+     MÉLANGE STABLE
+     ======================================================== */
+  function newSeed() { state.seed = (Math.random() * 4294967296) >>> 0; }
+
+  function shuffleArray(arr) {
+    const a = arr.slice();
+    let s = state.seed >>> 0;
+    const rnd = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(rnd() * (i + 1));
+      const tmp = a[i]; a[i] = a[j]; a[j] = tmp;
+    }
+    return a;
+  }
+
+  /* ========================================================
+     PUCES
+     ======================================================== */
+  function renderChips() {
+    const tokens = tokenize(state.text);
+    const seen = new Map();
+    tokens.forEach((t) => {
+      if (t.type !== 'word') return;
+      const key = normalize(t.value);
+      if (!seen.has(key)) seen.set(key, t.value);
+    });
+
+    chipsEl.innerHTML = '';
+
+    if (seen.size === 0) {
+      chipsEl.innerHTML = '<span class="chips-empty">— Saisissez d\'abord un texte —</span>';
+      updateHiddenCount();
+      return;
+    }
+
+    seen.forEach((display, key) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'chip' + (state.hidden.has(key) ? ' chip-on' : '');
+      btn.textContent = display;
+      btn.title = state.hidden.has(key) ? 'Cliquer pour réafficher' : 'Cliquer pour masquer';
+      btn.addEventListener('click', () => {
+        if (state.hidden.has(key)) state.hidden.delete(key);
+        else state.hidden.add(key);
+        const on = state.hidden.has(key);
+        btn.classList.toggle('chip-on', on);
+        btn.title = on ? 'Cliquer pour réafficher' : 'Cliquer pour masquer';
+        updateHiddenCount();
+      });
+      chipsEl.appendChild(btn);
+    });
+
+    updateHiddenCount();
+  }
+
+  function updateHiddenCount() {
+    const n = state.hidden.size;
+    hiddenCount.textContent = n === 0 ? '' : n + (n > 1 ? ' mots masqués' : ' mot masqué');
+  }
+
+  /* ========================================================
+     LISTE DES MOTS
+     ======================================================== */
+  let wordIdCounter = 0;
+
+  function renderWordList() {
+    wordListEl.innerHTML = '';
+
+    if (state.words.length === 0) {
+      const p = document.createElement('p');
+      p.className = 'hint';
+      p.style.margin = '0 0 .3rem';
+      p.textContent = 'Aucun mot pour le moment.';
+      wordListEl.appendChild(p);
+      return;
+    }
+
+    state.words.forEach((w, index) => {
+      const row = document.createElement('div');
+      row.className = 'word-item';
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.dir = 'rtl';
+      input.lang = 'ar';
+      input.value = w.text;
+      input.addEventListener('input', () => { w.text = input.value; });
+
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'icon-btn';
+      del.textContent = '✕';
+      del.title = 'Supprimer ce mot';
+      del.addEventListener('click', () => {
+        state.words.splice(index, 1);
+        renderWordList();
+      });
+
+      row.appendChild(input);
+      row.appendChild(del);
+      wordListEl.appendChild(row);
+    });
+  }
+
+  function addWord(value) {
+    const v = (value || '').trim();
+    if (!v) return;
+    state.words.push({ id: ++wordIdCounter, text: v });
+    renderWordList();
+  }
+
+  function hiddenWordsOrdered() {
+    const res = [];
+    const seen = new Set();
+    tokenize(state.text).forEach((t) => {
+      if (t.type !== 'word') return;
+      const key = normalize(t.value);
+      if (state.hidden.has(key) && !seen.has(key)) {
+        seen.add(key);
+        res.push(t.value);
+      }
+    });
+    return res;
+  }
+
+  /* ========================================================
+     RENDU DE L'EXERCICE
+     ======================================================== */
+  function renderExercise() {
+    const hasContent = state.text.trim() !== '' || state.image;
+
+    if (!hasContent) {
+      exerciseEl.innerHTML =
+        '<div class="empty">' +
+          '<div class="empty-icon">📝</div>' +
+          '<p>Aucun contenu. Retournez à la configuration pour saisir un texte.</p>' +
+        '</div>';
+      return;
+    }
+
+    /* --- Texte avec trous --- */
+    let n = 0;
+    const parts = tokenize(state.text).map((tok) => {
+      if (tok.type === 'sep') return esc(tok.value);
+      if (state.hidden.has(normalize(tok.value))) {
+        n++;
+        return '<span class="blank-wrap">' +
+                 '<span class="bnum">' + n + '</span>' +
+                 '<span class="blank"></span>' +
+               '</span>';
+      }
+      return esc(tok.value);
+    });
+
+    /* --- En-tête --- */
+    const title = state.title.trim();
+    let headHtml = '';
+    if (title || state.showNameDate) {
+      headHtml += '<div class="sheet-head">';
+      if (title) headHtml += '<h2 class="sheet-title">' + esc(title) + '</h2>';
+      if (state.showNameDate) {
+        headHtml += '<div class="sheet-namedate">' +
+                      '<span>الاسم : ................................</span>' +
+                      '<span>التاريخ : ........................</span>' +
+                    '</div>';
+      }
+      headHtml += '</div>';
+    }
+
+    /* --- Image (placée AVANT le texte pour apparaître à gauche) --- */
+    const figHtml = state.image
+      ? '<figure class="sheet-figure"><img src="' + state.image + '" alt=""></figure>'
+      : '';
+
+    /* --- Banque de mots --- */
+    const words = state.words.map((w) => w.text.trim()).filter(Boolean);
+    const ordered = state.shuffle ? shuffleArray(words) : words;
+    let bankHtml = '';
+    if (ordered.length) {
+      bankHtml =
+        '<div class="bank">' +
+          '<h3>الكلمات المقترحة</h3>' +
+          '<div class="bank-words">' +
+            ordered.map((w) => '<span class="bank-word">' + esc(w) + '</span>').join('') +
+          '</div>' +
+        '</div>';
+    }
+
+    exerciseEl.innerHTML =
+      '<div class="sheet">' +
+        headHtml +
+        '<div class="sheet-body">' +
+          figHtml +
+          '<div class="sheet-text" dir="rtl" lang="ar">' + parts.join('') + '</div>' +
+        '</div>' +
+        bankHtml +
+      '</div>';
+  }
+
+  /* ========================================================
+     NAVIGATION ENTRE LES PAGES
+     ======================================================== */
+  function showConfig() {
+    viewExercise.classList.remove('active');
+    viewConfig.classList.add('active');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function showExercise() {
+    renderExercise();
+    viewConfig.classList.remove('active');
+    viewExercise.classList.add('active');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  /* ========================================================
+     ÉVÉNEMENTS — SAISIE
+     ======================================================== */
+  arText.addEventListener('input', () => {
+    state.text = arText.value;
+    renderChips();
+  });
+
+  exTitle.addEventListener('input', () => {
+    state.title = exTitle.value;
+  });
+
+  $('clearHidden').addEventListener('click', () => {
+    state.hidden.clear();
+    renderChips();
+  });
+
+  $('addWord').addEventListener('click', () => {
+    addWord(newWordEl.value);
+    newWordEl.value = '';
+    newWordEl.focus();
+  });
+
+  newWordEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      $('addWord').click();
+    }
+  });
+
+  $('fillWords').addEventListener('click', () => {
+    const list = hiddenWordsOrdered();
+    if (list.length === 0) {
+      alert('Aucun mot masqué pour le moment.');
+      return;
+    }
+    state.words = list.map((w) => ({ id: ++wordIdCounter, text: w }));
+    renderWordList();
+  });
+
+  $('clearWords').addEventListener('click', () => {
+    state.words = [];
+    renderWordList();
+  });
+
+  shuffleEl.addEventListener('change', () => {
+    state.shuffle = shuffleEl.checked;
+    if (state.shuffle) newSeed();
+  });
+
+  nameDateEl.addEventListener('change', () => {
+    state.showNameDate = nameDateEl.checked;
+  });
+
+  /* ========================================================
+     ÉVÉNEMENTS — IMAGE
+     ======================================================== */
+  imgInput.addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      state.image = ev.target.result;
+      imgPreview.src = state.image;
+      imgWrap.classList.remove('hidden');
+    };
+    reader.readAsDataURL(file);
+  });
+
+  const BLANK_GIF = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
+
+  $('removeImg').addEventListener('click', () => {
+    state.image = null;
+    imgInput.value = '';
+    imgPreview.src = BLANK_GIF;
+    imgWrap.classList.add('hidden');
+  });
+
+  /* ========================================================
+     ÉVÉNEMENTS — BOUTONS PRINCIPAUX
+     ======================================================== */
+  $('btnGenerate').addEventListener('click', () => {
+    if (state.text.trim() === '' && !state.image) {
+      alert('Veuillez saisir un texte arabe ou ajouter une image avant de générer l\'exercice.');
+      return;
+    }
+    newSeed();
+    showExercise();
+  });
+
+  $('btnBack').addEventListener('click', showConfig);
+
+  $('btnPrint').addEventListener('click', () => window.print());
+
+  $('btnReset').addEventListener('click', () => {
+    if (!confirm('Réinitialiser tout l\'exercice ?')) return;
+
+    state.text = '';
+    state.hidden.clear();
+    state.words = [];
+    state.image = null;
+    state.shuffle = false;
+    state.showNameDate = true;
+    state.title = '';
+
+    arText.value = '';
+    exTitle.value = '';
+    newWordEl.value = '';
+    imgInput.value = '';
+    shuffleEl.checked = false;
+    nameDateEl.checked = true;
+    imgPreview.src = BLANK_GIF;
+    imgWrap.classList.add('hidden');
+
+    renderChips();
+    renderWordList();
+    arText.focus();
+  });
+
+  /* ========================================================
+     DÉMARRAGE
+     ======================================================== */
+  newSeed();
+  renderChips();
+  renderWordList();
+
+  // Exemple de démonstration (supprimez ces 3 lignes pour partir de zéro)
+  arText.value = 'ذهبَ التلميذُ إلى المدرسةِ في الصباحِ، وحملَ معهُ الكتابَ والقلمَ.';
+  state.text = arText.value;
+  renderChips();
+
+})();
+</script>
+</body>
+</html>
